@@ -3,3 +3,4 @@ target/
 db/
 grading/scripts/repos/
 CSCI_440_Project.iml
+*.DS_Store
