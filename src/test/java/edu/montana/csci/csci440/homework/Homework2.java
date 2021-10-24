@@ -16,7 +16,15 @@ public class Homework2 extends DBTest {
      */
     public void createTracksPlusView(){
         //TODO fill this in
-        executeDDL("CREATE VIEW tracksPlus");
+        executeDDL("CREATE VIEW tracksPlus AS " +
+                "SELECT tracks.*, artists.Name as ArtistName, albums.Title as AlbumTitle, genres.Name as GenreName " +
+                "FROM tracks " +
+                    "JOIN albums ON " +
+                        "tracks.AlbumId = albums.AlbumId " +
+                    "JOIN artists " +
+                        "ON albums.ArtistId = artists.ArtistId " +
+                    "JOIN genres " +
+                        "ON tracks.GenreId = genres.GenreId;");
 
         List<Map<String, Object>> results = executeSQL("SELECT * FROM tracksPlus ORDER BY TrackId");
         assertEquals(3503, results.size());
@@ -36,8 +44,27 @@ public class Homework2 extends DBTest {
      */
     public void createGrammyInfoTable(){
         //TODO fill these in
-        executeDDL("create table grammy_categories");
-        executeDDL("create table grammy_infos");
+        executeDDL("CREATE TABLE grammy_categories (" +
+                "GrammyCategoryId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                "Name NVARCHAR(200) NOT NULL" +
+                ");");
+
+        executeDDL("CREATE TABLE grammy_infos ( " +
+                "GrammyInfoId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "ArtistId INTEGER NOT NULL, " +
+                "AlbumId INTEGER NOT NULL, " +
+                "TrackId INTEGER NOT NULL, " +
+                "Status NVARCHAR(15) NOT NULL, " +
+                "GrammyCategoryId INTEGER NOT NULL, " +
+                "FOREIGN KEY (ArtistId) REFERENCES artists (ArtistId) " +
+                    " ON DELETE NO ACTION ON UPDATE NO ACTION, " +
+                "FOREIGN KEY (AlbumId) REFERENCES albums (AlbumId) " +
+                    "ON DELETE NO ACTION ON UPDATE NO ACTION, " +
+                "FOREIGN KEY (TrackId) REFERENCES tracks (TrackId) " +
+                    "ON DELETE NO ACTION ON UPDATE NO ACTION, " +
+                "FOREIGN KEY (GrammyCategoryId) REFERENCES grammy_categories (GrammyCategoryId) " +
+                    "ON DELETE NO ACTION ON UPDATE NO ACTION" +
+                " );");
 
         // TEST CODE
         executeUpdate("INSERT INTO grammy_categories(Name) VALUES ('Greatest Ever');");
@@ -61,7 +88,13 @@ public class Homework2 extends DBTest {
         Integer before = (Integer) executeSQL("SELECT COUNT(*) as COUNT FROM genres").get(0).get("COUNT");
 
         //TODO fill this in
-        executeUpdate("INSERT");
+        executeUpdate("INSERT INTO genres (Name)" +
+                " VALUES" +
+                " (\"Indie\"), " +
+                " (\"Bluegrass\")," +
+                " (\"Americana\"), " +
+                " (\"Lo-fi\")," +
+                " (\"Parody\");");
 
         Integer after = (Integer) executeSQL("SELECT COUNT(*) as COUNT FROM genres").get(0).get("COUNT");
         assertEquals(before + 5, after);
