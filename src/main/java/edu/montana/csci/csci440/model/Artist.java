@@ -2,10 +2,7 @@ package edu.montana.csci.csci440.model;
 
 import edu.montana.csci.csci440.util.DB;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -44,6 +41,70 @@ public class Artist extends Model {
         this.name = name;
     }
 
+    @Override
+    public boolean verify() {
+        _errors.clear();
+
+        if(name == null || "".equals(name)) {
+            addError("Artist name can't be null or blank!");
+        }
+
+        return !hasErrors();
+    }
+
+    @Override
+    public boolean create() {
+        if(verify()) {
+            try (Connection conn = DB.connect();
+                 PreparedStatement stmt = conn.prepareStatement(
+                         "INSERT INTO artists (Name) VALUES(?)")) {
+
+                stmt.setString(1, this.name);
+                stmt.executeUpdate();
+                artistId = DB.getLastID(conn);
+
+                return true;
+            } catch (SQLException sqlException) {
+                throw new RuntimeException(sqlException);
+            }
+        } else {
+            return false;
+        }
+
+    }
+
+    @Override
+    public boolean update() {
+        if(verify()) {
+            try (Connection conn = DB.connect();
+                 PreparedStatement stmt = conn.prepareStatement(
+                         "UPDATE artists SET Name = ? WHERE ArtistId = ?")) {
+
+                stmt.setString(1, this.name);
+                stmt.setLong(2, this.artistId);
+
+                stmt.executeUpdate();
+                return true;
+            } catch (SQLException sqlException) {
+                throw new RuntimeException(sqlException);
+            }
+        } else {
+            return false;
+        }
+    }
+
+    @Override
+    public void delete() {
+        try (Connection conn = DB.connect();
+             PreparedStatement stmt = conn.prepareStatement(
+                     "DELETE FROM artists WHERE ArtistId=?")) {
+            stmt.setLong(1, this.artistId);
+            stmt.executeUpdate();
+        } catch (SQLException sqlException) {
+            throw new RuntimeException(sqlException);
+        }
+    }
+
     public static List<Artist> all() {
         return all(0, Integer.MAX_VALUE);
     }
@@ -51,9 +112,10 @@ public class Artist extends Model {
     public static List<Artist> all(int page, int count) {
         try (Connection conn = DB.connect();
              PreparedStatement stmt = conn.prepareStatement(
-                     "SELECT * FROM artists LIMIT ?"
+                     "SELECT * FROM artists LIMIT ? OFFSET ?"
              )) {
             stmt.setInt(1, count);
+            stmt.setInt(2, (page-1)*count);
             ResultSet results = stmt.executeQuery();
             List<Artist> resultList = new LinkedList<>();
             while (results.next()) {

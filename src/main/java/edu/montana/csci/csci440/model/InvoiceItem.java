@@ -1,6 +1,8 @@
 package edu.montana.csci.csci440.model;
 
 import java.math.BigDecimal;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 public class InvoiceItem extends Model {
 
@@ -9,6 +11,14 @@ public class InvoiceItem extends Model {
     Long trackId;
     BigDecimal unitPrice;
     Long quantity;
+
+    protected InvoiceItem(ResultSet results) throws SQLException {
+        invoiceLineId = results.getLong("invoiceLineId");
+        invoiceId = results.getLong("invoiceId");
+        trackId = results.getLong("trackId");
+        unitPrice = results.getBigDecimal("unitPrice");
+        quantity = results.getLong("quantity");
+    }
 
     public Track getTrack() {
         return null;

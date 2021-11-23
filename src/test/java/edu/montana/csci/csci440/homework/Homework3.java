@@ -17,7 +17,7 @@ public class Homework3 extends DBTest {
 
     @Test
     /*
-     * Use a transaction to safely move milliseconds from one track to anotherls
+     * Use a transaction to safely move milliseconds from one track to another
      *
      * You will need to use the JDBC transaction API, outlined here:
      *
@@ -33,17 +33,18 @@ public class Homework3 extends DBTest {
 
         try(Connection connection = DB.connect()){
             connection.setAutoCommit(false);
-            PreparedStatement subtract = connection.prepareStatement("TODO");
-            subtract.setLong(1, 0);
-            subtract.setLong(2, 0);
+            PreparedStatement subtract = connection.prepareStatement("UPDATE tracks SET Milliseconds=(Milliseconds-?) WHERE TrackId = ?");
+            subtract.setLong(1, 10);
+            subtract.setLong(2, track1.getTrackId());
             subtract.execute();
 
-            PreparedStatement add = connection.prepareStatement("TODO");
-            subtract.setLong(1, 0);
-            subtract.setLong(2, 0);
-            subtract.execute();
+            PreparedStatement add = connection.prepareStatement("UPDATE tracks SET Milliseconds=(Milliseconds+?) WHERE TrackId = ?");
+            add.setLong(1, 10);
+            add.setLong(2, track2.getTrackId());
+            add.execute();
 
             // commit with the connection
+            connection.commit();
         }
 
         // refresh tracks from db
@@ -57,7 +58,7 @@ public class Homework3 extends DBTest {
     /*
      * Select tracks that have been sold more than once (> 1)
      *
-     * Select the albumbs that have tracks that have been sold more than once (> 1)
+     * Select the albums that have tracks that have been sold more than once (> 1)
      *   NOTE: This is NOT the same as albums whose tracks have been sold more than once!
      *         An album could have had three tracks, each sold once, and should not be included
      *         in this result.  It should only include the albums of the tracks found in the first
@@ -66,15 +67,26 @@ public class Homework3 extends DBTest {
     public void selectPopularTracksAndTheirAlbums() throws SQLException {
 
         // HINT: join to invoice items and do a group by/having to get the right answer
-        List<Map<String, Object>> tracks = executeSQL("");
+        List<Map<String, Object>> tracks = executeSQL("SELECT tracks.*" +
+                                    " FROM tracks" +
+                                    " JOIN invoice_items ON tracks.TrackId = invoice_items.TrackId" +
+                                    " GROUP BY tracks.TrackId" +
+                                    " HAVING COUNT(*) > 1");
         assertEquals(256, tracks.size());
 
         // HINT: join to tracks and invoice items and do a group by/having to get the right answer
         //       note: you will need to use the DISTINCT operator to get the right result!
-        List<Map<String, Object>> albums = executeSQL("");
+        List<Map<String, Object>> albums = executeSQL(" SELECT DISTINCT *" +
+                " FROM albums" +
+                " WHERE albums.AlbumId IN (" +
+                "       SELECT tracks.AlbumId" +
+                "        FROM tracks" +
+                "        JOIN invoice_items ON tracks.TrackId = invoice_items.TrackId" +
+                "        GROUP BY tracks.TrackId" +
+                "        HAVING COUNT(*) > 1" +
+                "  )");
         assertEquals(166, albums.size());
     }
-
     @Test
     /*
      * Select customers emails who are assigned to Jane Peacock as a Rep and
@@ -84,9 +96,18 @@ public class Homework3 extends DBTest {
      * */
     public void selectCustomersMeetingCriteria() throws SQLException {
         // HINT: join to invoice items and do a group by/having to get the right answer
-        List<Map<String, Object>> tracks = executeSQL("" );
-        assertEquals(21, tracks.size());
+        List<Map<String, Object>> customers = executeSQL("SELECT DISTINCT customers.CustomerId" +
+                " FROM customers" +
+                " JOIN employees ON customers.SupportRepId = employees.EmployeeId" +
+                " JOIN invoices ON invoices.CustomerId = customers.CustomerId" +
+                " JOIN invoice_items ON invoice_items.InvoiceId = invoices.InvoiceId" +
+                " WHERE employees.FirstName = 'Jane' AND employees.LastName = 'Peacock' AND" +
+                "   invoice_items.InvoiceId IN (" +
+                "    SELECT invoice_items.InvoiceId FROM invoice_items" +
+                "    JOIN tracks ON invoice_items.TrackId = tracks.TrackId" +
+                "    JOIN genres ON genres.GenreId = tracks.GenreId" +
+                "    WHERE genres.Name = 'Rock'" +
+                " )" );
+        assertEquals(21, customers.size());
     }
-
-
 }

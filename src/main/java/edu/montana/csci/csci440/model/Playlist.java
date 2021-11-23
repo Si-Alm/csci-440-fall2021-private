@@ -18,15 +18,32 @@ public class Playlist extends Model {
     public Playlist() {
     }
 
-    private Playlist(ResultSet results) throws SQLException {
+    Playlist(ResultSet results) throws SQLException {
         name = results.getString("Name");
         playlistId = results.getLong("PlaylistId");
     }
 
-
+    // TODO: returns arbitrary number of extra values?
     public List<Track> getTracks(){
-        // TODO implement, order by track name
-        return Collections.emptyList();
+        try(Connection conn = DB.connect();
+            PreparedStatement stmt = conn.prepareStatement(
+                   "SELECT * FROM tracks " +
+                       "JOIN playlist_track ON tracks.TrackId = playlist_track.TrackId " +
+                       "JOIN playlists ON playlists.PlaylistId = playlist_track.PlaylistId" +
+                       "WHERE playlists.Name = ?" +
+                       "GROUP BY tracks.Name"
+            )
+        ) { //"WHERE playlist_track.PlaylistId = ? " +
+            stmt.setString(1, this.name);
+            ResultSet results = stmt.executeQuery();
+            List<Track> resultList = new LinkedList<>();
+            while (results.next()) {
+                resultList.add(new Track(results));
+            }
+            return resultList;
+        } catch (SQLException sqlException) {
+            throw new RuntimeException(sqlException);
+        }
     }
 
     public Long getPlaylistId() {
@@ -48,9 +65,10 @@ public class Playlist extends Model {
     public static List<Playlist> all(int page, int count) {
         try (Connection conn = DB.connect();
              PreparedStatement stmt = conn.prepareStatement(
-                     "SELECT * FROM playlists LIMIT ?"
+                     "SELECT * FROM playlists LIMIT ? OFFSET ?"
              )) {
             stmt.setInt(1, count);
+            stmt.setInt(2, (page-1)*count);
             ResultSet results = stmt.executeQuery();
             List<Playlist> resultList = new LinkedList<>();
             while (results.next()) {

@@ -20,11 +20,12 @@ public class Invoice extends Model {
     BigDecimal total;
 
     public Invoice() {
-        // new employee for insert
+        // new invoice for insert
     }
 
     private Invoice(ResultSet results) throws SQLException {
         billingAddress = results.getString("BillingAddress");
+        billingCity = results.getString("BillingCity");
         billingState = results.getString("BillingState");
         billingCountry = results.getString("BillingCountry");
         billingPostalCode = results.getString("BillingPostalCode");
@@ -33,8 +34,22 @@ public class Invoice extends Model {
     }
 
     public List<InvoiceItem> getInvoiceItems(){
-        //TODO implement
-        return Collections.emptyList();
+        try (Connection conn = DB.connect();
+             PreparedStatement stmt = conn.prepareStatement(
+                     "SELECT * FROM invoice_items " +
+                             "JOIN invoice on invoice_items.InvoiceId = invoices.InvoiceId " +
+                             "WHERE invoices.Id = ?"
+             )) {
+            stmt.setLong(1, this.invoiceId);
+            ResultSet results = stmt.executeQuery();
+            List<InvoiceItem> resultList = new LinkedList<>();
+            while (results.next()) {
+                resultList.add(new InvoiceItem(results));
+            }
+            return resultList;
+        } catch (SQLException sqlException) {
+            throw new RuntimeException(sqlException);
+        }
     }
     public Customer getCustomer() {
         return null;
@@ -99,9 +114,10 @@ public class Invoice extends Model {
     public static List<Invoice> all(int page, int count) {
         try (Connection conn = DB.connect();
              PreparedStatement stmt = conn.prepareStatement(
-                     "SELECT * FROM invoices LIMIT ?"
+                     "SELECT * FROM invoices LIMIT ? OFFSET ?"
              )) {
             stmt.setInt(1, count);
+            stmt.setInt(2, (page-1)*count);
             ResultSet results = stmt.executeQuery();
             List<Invoice> resultList = new LinkedList<>();
             while (results.next()) {
