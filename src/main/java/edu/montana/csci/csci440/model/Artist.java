@@ -12,6 +12,7 @@ public class Artist extends Model {
 
     Long artistId;
     String name;
+    String oldName;
 
     public Artist() {
     }
@@ -19,6 +20,7 @@ public class Artist extends Model {
     private Artist(ResultSet results) throws SQLException {
         name = results.getString("Name");
         artistId = results.getLong("ArtistId");
+        oldName = "";
     }
 
     public List<Album> getAlbums(){
@@ -38,6 +40,7 @@ public class Artist extends Model {
     }
 
     public void setName(String name) {
+        this.oldName = this.name;
         this.name = name;
     }
 
@@ -47,6 +50,9 @@ public class Artist extends Model {
 
         if(name == null || "".equals(name)) {
             addError("Artist name can't be null or blank!");
+        }
+         if (null != artistId && !oldName.equals(Artist.find(artistId).getName())) {
+            addError("No artist with this name!");
         }
 
         return !hasErrors();

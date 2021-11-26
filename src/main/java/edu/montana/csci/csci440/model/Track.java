@@ -1,17 +1,13 @@
 package edu.montana.csci.csci440.model;
 
 import edu.montana.csci.csci440.util.DB;
-import redis.clients.jedis.Client;
 import redis.clients.jedis.Jedis;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -22,9 +18,12 @@ public class Track extends Model {
     private Long mediaTypeId;
     private Long genreId;
     private String name;
+    private String artistName;
+    private String albumTitle;
     private Long milliseconds;
     private Long bytes;
     private BigDecimal unitPrice;
+    private static long count = 0;
 
     public static final String REDIS_CACHE_KEY = "cs440-tracks-count-cache";
 
@@ -45,6 +44,8 @@ public class Track extends Model {
         albumId = results.getLong("AlbumId");
         mediaTypeId = results.getLong("MediaTypeId");
         genreId = results.getLong("GenreId");
+        artistName = getAlbum().getArtist().getName();
+        albumTitle = getAlbum().getTitle();
     }
 
     public static Track find(long i) {
@@ -64,17 +65,26 @@ public class Track extends Model {
 
     public static Long count() {
         Jedis redisClient = new Jedis(); // use this class to access redis and create a cache
-        try (Connection conn = DB.connect();
-             PreparedStatement stmt = conn.prepareStatement("SELECT COUNT(*) as Count FROM tracks")) {
-            ResultSet results = stmt.executeQuery();
-            if (results.next()) {
-                return results.getLong("Count");
-            } else {
-                throw new IllegalStateException("Should find a count!");
+        String redisCache = redisClient.get(REDIS_CACHE_KEY);
+
+        if(null == redisCache || count != Integer.parseInt(redisCache)) {
+            try (Connection conn = DB.connect();
+                 PreparedStatement stmt = conn.prepareStatement("SELECT COUNT(*) as Count FROM tracks")) {
+                ResultSet results = stmt.executeQuery();
+                redisCache = String.valueOf(results.getLong("Count"));
+                redisClient.set(REDIS_CACHE_KEY, redisCache);
+                count = Integer.parseInt(redisCache);
+                if (results.next()) {
+                    return results.getLong("Count");
+                } else {
+                    throw new IllegalStateException("Should find a count!");
+                }
+            } catch (SQLException sqlException) {
+                throw new RuntimeException(sqlException);
             }
-        } catch (SQLException sqlException) {
-            throw new RuntimeException(sqlException);
         }
+
+        return Long.parseLong(redisClient.get(REDIS_CACHE_KEY));
     }
 
     public Album getAlbum() {
@@ -89,25 +99,7 @@ public class Track extends Model {
 
 
     public List<Playlist> getPlaylists(){
-        try(Connection conn = DB.connect();
-            PreparedStatement stmt = conn.prepareStatement(
-                    "SELECT * FROM playlists " +
-                            "JOIN playlist_track ON tracks.TrackId = playlist_track.TrackId " +
-                            "JOIN playlists ON playlist_track.PlaylistId = playlists.PlaylistId " +
-                            "WHERE playlist_track.TrackId = ? " +
-                            "GROUP BY tracks.Name"
-            )
-        ) {
-            stmt.setLong(1, this.trackId);
-            ResultSet results = stmt.executeQuery();
-            List<Playlist> resultList = new LinkedList<>();
-            while (results.next()) {
-                resultList.add(new Playlist(results));
-            }
-            return resultList;
-        } catch (SQLException sqlException) {
-            throw new RuntimeException(sqlException);
-        }
+        return Playlist.forTracks(this.trackId);
     }
 
     public Long getTrackId() {
@@ -209,7 +201,7 @@ public class Track extends Model {
                 stmt.setLong(5, this.milliseconds);
                 stmt.setLong(6, this.bytes);
                 stmt.setBigDecimal(7, this.unitPrice);
-
+                count++;
                 this.trackId = DB.getLastID(conn);
 
                 return true;
@@ -256,13 +248,13 @@ public class Track extends Model {
     public String getArtistName() {
         // TODO implement more efficiently
         //  hint: cache on this model object
-        return getAlbum().getArtist().getName();
+        return artistName;
     }
 
     public String getAlbumTitle() {
         // TODO implement more efficiently
         //  hint: cache on this model object
-        return getAlbum().getTitle();
+        return albumTitle;
     }
 
     public static List<Track> advancedSearch(int page, int count,
@@ -277,12 +269,29 @@ public class Track extends Model {
 
         // Conditionally include the query and argument
         if (artistId != null) {
-            query += " AND ArtistId=? ";
+            query += " AND albums.ArtistId=? ";
             args.add(artistId);
         }
 
-        query += " LIMIT ?";
+        if(null != albumId) {
+            query += " AND tracks.AlbumId = ?";
+            args.add(albumId);
+        }
+
+        if(null != maxRuntime) {
+            query += " AND Milliseconds <= ?";
+            args.add(1000 * maxRuntime);
+        }
+
+        if(null != minRuntime) {
+            query += " AND Milliseconds >= ?";
+            args.add(1000 * minRuntime);
+        }
+
+        query += " ORDER BY TrackId";
+        query += " LIMIT ? OFFSET ? ";
         args.add(count);
+        args.add(count * page - count);
 
         try (Connection conn = DB.connect();
              PreparedStatement stmt = conn.prepareStatement(query)) {
@@ -302,12 +311,14 @@ public class Track extends Model {
     }
 
     public static List<Track> search(int page, int count, String orderBy, String search) {
-        String query = "SELECT * FROM tracks WHERE name LIKE ? LIMIT ?";
+        String query = "SELECT * FROM tracks WHERE name LIKE ? ORDER BY " + orderBy + " LIMIT ? OFFSET";
         search = "%" + search + "%";
         try (Connection conn = DB.connect();
              PreparedStatement stmt = conn.prepareStatement(query)) {
             stmt.setString(1, search);
-            stmt.setInt(2, count);
+            stmt.setString(2, orderBy);
+            stmt.setInt(3, count);
+            stmt.setInt(4, page * count - count);
             ResultSet results = stmt.executeQuery();
             List<Track> resultList = new LinkedList<>();
             while (results.next()) {
@@ -335,6 +346,25 @@ public class Track extends Model {
         }
     }
 
+    public static List<Track> forPlaylist(Long playlistId) {
+        String query = "SELECT * FROM tracks" +
+                " JOIN playlist_track ON tracks.TrackId = playlist_track.TrackId" +
+                " WHERE playlist_track.PlaylistId = ?" +
+                " ORDER BY tracks.Name";
+        try (Connection conn = DB.connect();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setLong(1, playlistId);
+            ResultSet results = stmt.executeQuery();
+            List<Track> resultList = new LinkedList<>();
+            while (results.next()) {
+                resultList.add(new Track(results));
+            }
+            return resultList;
+        } catch (SQLException sqlException) {
+            throw new RuntimeException(sqlException);
+        }
+    }
+
     // Sure would be nice if java supported default parameter values
     public static List<Track> all() {
         return all(0, Integer.MAX_VALUE);
@@ -347,12 +377,12 @@ public class Track extends Model {
     public static List<Track> all(int page, int count, String orderBy) {
 
         try (Connection conn = DB.connect();
-             PreparedStatement stmt = conn.prepareStatement(
-                     "SELECT * FROM tracks ORDER BY ? LIMIT ? OFFSET ?"
+             PreparedStatement stmt = conn.prepareStatement("SELECT * FROM tracks " +
+                     "ORDER BY " + orderBy + " LIMIT ? OFFSET ?"
              )) {
-            stmt.setString(1, orderBy);
-            stmt.setInt(2, count);
-            stmt.setInt(3, (page-1) * count);
+            //stmt.setString(1, orderBy); <-- wouldn't work with statement method?
+            stmt.setInt(1, count);
+            stmt.setInt(2, count * page - count);
 
             ResultSet results = stmt.executeQuery();
             List<Track> resultList = new LinkedList<>();
@@ -364,5 +394,4 @@ public class Track extends Model {
             throw new RuntimeException(sqlException);
         }
     }
-
 }

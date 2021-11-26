@@ -31,8 +31,25 @@ public class Employee extends Model {
     }
 
     public static List<Employee.SalesSummary> getSalesSummaries() {
-        //TODO - a GROUP BY query to determine the sales (look at the invoices table), using the SalesSummary class
-        return Collections.emptyList();
+        try (Connection conn = DB.connect();
+             PreparedStatement stmt = conn.prepareStatement(
+                     "SELECT employees.FirstName, Employees.LastName, employees.Email, COUNT(Total) as salesCount, ROUND(SUM(Total),2) as salesTotal" +
+                         " FROM invoices" +
+                         " JOIN customers ON customers.CustomerId = invoices.CustomerId" +
+                         " JOIN employees ON customers.SupportRepId = employees.EmployeeId" +
+                         " GROUP BY employees.FirstName" +
+                         " HAVING salesTotal"
+             )) {
+
+            ResultSet results = stmt.executeQuery();
+            List<Employee.SalesSummary> resultList = new LinkedList<>();
+            while (results.next()) {
+                resultList.add(new Employee.SalesSummary(results));
+            }
+            return resultList;
+        } catch (SQLException sqlException) {
+            throw new RuntimeException(sqlException);
+        }
     }
 
     @Override

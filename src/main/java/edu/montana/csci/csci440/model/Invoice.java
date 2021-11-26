@@ -37,8 +37,8 @@ public class Invoice extends Model {
         try (Connection conn = DB.connect();
              PreparedStatement stmt = conn.prepareStatement(
                      "SELECT * FROM invoice_items " +
-                             "JOIN invoice on invoice_items.InvoiceId = invoices.InvoiceId " +
-                             "WHERE invoices.Id = ?"
+                             "JOIN invoices on invoice_items.InvoiceId = invoices.InvoiceId " +
+                             "WHERE invoices.InvoiceId = ?"
              )) {
             stmt.setLong(1, this.invoiceId);
             ResultSet results = stmt.executeQuery();

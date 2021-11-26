@@ -96,6 +96,7 @@ public class Homework3 extends DBTest {
      * */
     public void selectCustomersMeetingCriteria() throws SQLException {
         // HINT: join to invoice items and do a group by/having to get the right answer
+        // guessing you could probably do this without five joins, but we'll send it anyways
         List<Map<String, Object>> customers = executeSQL("SELECT DISTINCT customers.CustomerId" +
                 " FROM customers" +
                 " JOIN employees ON customers.SupportRepId = employees.EmployeeId" +

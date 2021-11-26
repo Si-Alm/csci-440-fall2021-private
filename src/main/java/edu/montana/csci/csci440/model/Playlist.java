@@ -25,20 +25,21 @@ public class Playlist extends Model {
 
     // TODO: returns arbitrary number of extra values?
     public List<Track> getTracks(){
-        try(Connection conn = DB.connect();
-            PreparedStatement stmt = conn.prepareStatement(
-                   "SELECT * FROM tracks " +
-                       "JOIN playlist_track ON tracks.TrackId = playlist_track.TrackId " +
-                       "JOIN playlists ON playlists.PlaylistId = playlist_track.PlaylistId" +
-                       "WHERE playlists.Name = ?" +
-                       "GROUP BY tracks.Name"
-            )
-        ) { //"WHERE playlist_track.PlaylistId = ? " +
-            stmt.setString(1, this.name);
+        return Track.forPlaylist(this.playlistId);
+    }
+
+    public static List<Playlist> forTracks(long trackId) {
+        try (Connection conn = DB.connect();
+             PreparedStatement stmt = conn.prepareStatement(
+                     "SELECT * FROM playlists" +
+                         " JOIN playlist_track ON playlists.PlaylistId = playlist_track.PlaylistId" +
+                         " WHERE playlist_track.TrackId = ?"
+             )) {
+            stmt.setLong(1, trackId);
             ResultSet results = stmt.executeQuery();
-            List<Track> resultList = new LinkedList<>();
+            List<Playlist> resultList = new LinkedList<>();
             while (results.next()) {
-                resultList.add(new Track(results));
+                resultList.add(new Playlist(results));
             }
             return resultList;
         } catch (SQLException sqlException) {
