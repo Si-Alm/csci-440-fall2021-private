@@ -311,14 +311,13 @@ public class Track extends Model {
     }
 
     public static List<Track> search(int page, int count, String orderBy, String search) {
-        String query = "SELECT * FROM tracks WHERE name LIKE ? ORDER BY " + orderBy + " LIMIT ? OFFSET";
+        String query = "SELECT * FROM tracks WHERE name LIKE ? ORDER BY " + orderBy + " LIMIT ? OFFSET ?";
         search = "%" + search + "%";
         try (Connection conn = DB.connect();
              PreparedStatement stmt = conn.prepareStatement(query)) {
             stmt.setString(1, search);
-            stmt.setString(2, orderBy);
-            stmt.setInt(3, count);
-            stmt.setInt(4, page * count - count);
+            stmt.setInt(2, count);
+            stmt.setInt(3, page * count - count);
             ResultSet results = stmt.executeQuery();
             List<Track> resultList = new LinkedList<>();
             while (results.next()) {

@@ -30,6 +30,10 @@ public class Album extends Model {
         artistId = artist.getArtistId();
     }
 
+    public void setArtistId(long artistId){
+        this.artistId = artistId;
+    }
+
     public List<Track> getTracks() {
         return Track.forAlbum(albumId);
     }
