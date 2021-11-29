@@ -5,9 +5,14 @@
 <div style="padding: 12px">
     <form>
         <b>Search </b>
-        <input type="text" placeholder="Search by track, album or artist name..."
+        <!--<input type="text" placeholder="Search by track, album or artist name..."
                name="q"
-               value="$!web.param('q')">
+               value="$!web.param('q')">-->
+        <input class="form-control" type="text" placeholder="Search by track, album or artist name..."
+                name="q"
+                hx-get="/tracks"
+                hx-trigger="keyup changed delay:500ms"
+                hx-target="#search-results">
         <a href="/tracks/search">Advanced Search >></a>
     </form>
 </div>
@@ -24,7 +29,7 @@
         <th>UnitPrice</th>
     </tr>
     </thead>
-    <tbody>
+    <tbody id="search-results">
         #foreach( $track in $tracks )
         <tr>
             <td><a href="/tracks/$track.TrackId">$track.TrackId</a></td>

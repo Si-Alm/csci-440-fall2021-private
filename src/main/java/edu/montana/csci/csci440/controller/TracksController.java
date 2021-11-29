@@ -1,6 +1,5 @@
 package edu.montana.csci.csci440.controller;
 
-import edu.montana.csci.csci440.model.Artist;
 import edu.montana.csci.csci440.model.Track;
 import edu.montana.csci.csci440.util.Web;
 
@@ -37,10 +36,12 @@ public class TracksController {
             List<Track> tracks;
             if (search != null) {
                 tracks = Track.search(Web.getPage(), Web.PAGE_SIZE, orderBy, search);
+                // render just the table body, for active search
+                return Web.renderTemplate("templates/tracks/active-search.vm",
+                        "tracks", tracks);
             } else {
                 tracks = Track.all(Web.getPage(), Web.PAGE_SIZE, orderBy);
             }
-            // TODO - implement cache of count w/ Redis
             long totalTracks = Track.count();
             return Web.renderTemplate("templates/tracks/index.vm",
                     "tracks", tracks, "totalTracks", totalTracks);
